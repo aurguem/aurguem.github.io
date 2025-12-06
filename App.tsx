@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, Files, X, BarChart2, Terminal, Lightbulb, AlertCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Files, X, BarChart2, Terminal, Lightbulb, AlertCircle, Stethoscope, FileText, Info } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
 import KPICard from './components/KPICard';
 import { DistributionChart, CountBarChart } from './components/AnalysisCharts';
 import { loadModelFromUrl, analyzeImage } from './services/aiService';
 import { AnalysisResult, DashboardStats } from './types';
-import { KOREAN_LABELS, CLASS_COLORS, MODEL_URL } from './constants';
+import { KOREAN_LABELS, CLASS_COLORS, MODEL_URL, DISEASE_DESCRIPTIONS, DISEASE_LABELS } from './constants';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any | null>(null);
@@ -112,6 +112,12 @@ const App: React.FC = () => {
 
   const isLowConfidence = results.length > 0 && results[0].confidence < 0.4;
   const isBiasDetected = results.length >= 5 && results.every(r => r.diagnosis === results[0].diagnosis);
+
+  const getConfidenceInfo = (score: number) => {
+    if (score >= 0.8) return { label: '높음', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+    if (score >= 0.5) return { label: '중간', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
+    return { label: '낮음', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
+  };
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
@@ -257,58 +263,99 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Detail Modal */}
+      {/* Detail Modal: Medical Report Format */}
       {selectedResult && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setSelectedResult(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
-              <div className="flex gap-4">
-                <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
-                  {selectedResult.thumbnailUrl && <img src={selectedResult.thumbnailUrl} alt="t" className="w-full h-full object-cover" />}
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+                <div className="flex items-center gap-2 text-slate-800">
+                    <Stethoscope className="w-6 h-6 text-purple-600" />
+                    <h3 className="text-xl font-bold">피부질환 분석 결과</h3>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">{selectedResult.fileName}</h3>
-                  <div className="flex items-center gap-2 mt-2">
-                     <span className="text-sm text-slate-500 font-medium">최종 판정:</span>
-                     <span className="text-sm font-bold" style={{ color: CLASS_COLORS[selectedResult.koreanLabel] }}>{selectedResult.koreanLabel}</span>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setSelectedResult(null)}><X className="w-6 h-6 text-slate-400" /></button>
+                <button onClick={() => setSelectedResult(null)}><X className="w-6 h-6 text-slate-400 hover:text-slate-600" /></button>
             </div>
+
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                <section>
-                    <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><BarChart2 className="w-4 h-4 text-purple-500" /> 상세 확신도 분석</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {selectedResult.probabilities.map((prob, idx) => {
-                            const label = KOREAN_LABELS[idx];
-                            return (
-                                <div key={idx} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                    <div className="flex justify-between text-sm mb-2">
-                                        <span className="font-semibold text-slate-700">{label}</span>
-                                        <span className="font-mono text-slate-600 font-bold">{(prob * 100).toFixed(2)}%</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${prob * 100}%`, backgroundColor: CLASS_COLORS[label] || '#94a3b8' }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
+                {/* 1. Image & Diagnosis */}
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-1/3 aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
+                        {selectedResult.thumbnailUrl && <img src={selectedResult.thumbnailUrl} alt="Analyzed" className="w-full h-full object-cover" />}
                     </div>
-                </section>
-                <section className="bg-slate-900 rounded-xl p-5 text-slate-300 font-mono text-xs">
-                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Terminal className="w-4 h-4 text-green-400" /> Raw Output (Index)</h4>
-                    <div className="overflow-hidden border border-slate-700 rounded-lg">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-800 text-slate-400"><tr><th className="px-4 py-2">Index</th><th className="px-4 py-2">Prob</th></tr></thead>
-                            <tbody className="divide-y divide-slate-800">
-                                {selectedResult.probabilities.map((prob, idx) => (
-                                    <tr key={idx}><td className="px-4 py-2">{idx}</td><td className="px-4 py-2">{prob.toFixed(6)}</td></tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="flex-1 space-y-6">
+                        {/* 1. 진단명 */}
+                        <div>
+                            <span className="text-sm font-bold text-slate-400 block mb-1">1. 진단명 (Diagnosis)</span>
+                            <div className="text-3xl font-bold" style={{ color: CLASS_COLORS[selectedResult.koreanLabel] }}>
+                                {selectedResult.koreanLabel}
+                            </div>
+                            <div className="text-slate-400 text-sm font-medium mt-1">({selectedResult.diagnosis})</div>
+                        </div>
+                        
+                        {/* 2. 확신도 */}
+                        <div>
+                            <span className="text-sm font-bold text-slate-400 block mb-1">2. 확신도 (Confidence)</span>
+                            <div className="flex items-center gap-3">
+                                {(() => {
+                                    const confInfo = getConfidenceInfo(selectedResult.confidence);
+                                    return (
+                                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${confInfo.bg} ${confInfo.color} ${confInfo.border}`}>
+                                            {confInfo.label} ({(selectedResult.confidence * 100).toFixed(1)}%)
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        </div>
                     </div>
-                </section>
+                </div>
+
+                <hr className="border-slate-100" />
+
+                {/* 3. 시각적 근거 */}
+                <div>
+                    <span className="text-sm font-bold text-slate-400 block mb-2 flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> 3. 시각적 근거 (Visual Evidence)
+                    </span>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-700 leading-relaxed font-medium">
+                        {(() => {
+                            const index = DISEASE_LABELS.indexOf(selectedResult.diagnosis);
+                            return index !== -1 ? DISEASE_DESCRIPTIONS[index] : "분석된 특징 정보가 없습니다.";
+                        })()}
+                    </div>
+                </div>
+
+                {/* 4. 주의사항 */}
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-3">
+                    <Info className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="text-sm font-bold text-orange-800 mb-1">4. 주의사항 (Disclaimer)</h4>
+                        <p className="text-xs text-orange-700 leading-relaxed">
+                            이 결과는 AI의 시각적 패턴 분석에 기반한 것으로, <strong>의학적 진단이 아닙니다.</strong><br/>
+                            정확한 진단과 치료를 위해서는 반드시 피부과 전문의를 방문하여 상담받으시기 바랍니다.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Supplementary: Detailed Charts (Collapsed or Secondary) */}
+                <div className="pt-4">
+                    <details className="group">
+                        <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-500 hover:text-purple-600 transition-colors">
+                            <BarChart2 className="w-4 h-4" /> 상세 수치 데이터 보기
+                        </summary>
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4 border-l-2 border-slate-100">
+                             {selectedResult.probabilities.map((prob, idx) => {
+                                const label = KOREAN_LABELS[idx];
+                                const isMax = idx === DISEASE_LABELS.indexOf(selectedResult.diagnosis);
+                                return (
+                                    <div key={idx} className={`flex justify-between text-xs ${isMax ? 'font-bold text-slate-800' : 'text-slate-500'}`}>
+                                        <span>{label}</span>
+                                        <span>{(prob * 100).toFixed(1)}%</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </details>
+                </div>
             </div>
           </div>
         </div>
