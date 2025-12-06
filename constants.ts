@@ -45,4 +45,4 @@ export const CHART_COLORS = [
 ];
 
 // CRITICAL: The requested Model URL with CORS Proxy
-export const MODEL_URL = "https://github.com/aurguem/mediskin.github.io/releases/download/v1.0/model3.onnx";
+export const MODEL_URL = "https://corsproxy.io/?https://drive.google.com/uc?export=download&id=1mp1tRdasHhsxQCGqk5ppeRHaS72gTULK";
