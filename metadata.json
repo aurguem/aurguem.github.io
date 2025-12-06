@@ -1,0 +1,5 @@
+{
+  "name": "MediSkin AI - Serverless Analysis",
+  "description": "TensorFlow.js 기반의 서버리스 의료 이미지 분석 대시보드. 사용자가 브라우저에서 직접 모델 파일을 업로드하여 로컬에서 이미지를 분석합니다.",
+  "requestFramePermissions": []
+}
